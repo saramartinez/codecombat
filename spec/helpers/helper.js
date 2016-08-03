@@ -36,7 +36,7 @@ if (database.generateMongoConnectionString() !== dbString) {
   throw Error('Stopping server tests because db connection string was not as expected.');
 }
 
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000 * 10; // for long Stripe tests
+jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000 * 15; // for long Stripe tests
 require('../server/common'); // Make sure global testing functions are set up
 
 // Ignore Stripe/Nocking erroring
@@ -48,6 +48,15 @@ console.error = function() {
   catch (e) { }
   console.log.apply(console, arguments);
 };
+
+if (process.argv.indexOf('--with-test-names') > -1) {
+  jasmine.getEnv().addReporter({
+    specStarted: function(result){
+      // Printing weirdly so pass/fail indicator is on the same line as the test name
+      process.stdout.write('\n' + result.fullName);
+    }
+  })
+}
 
 var initialized = false;
 beforeEach(function(done) {

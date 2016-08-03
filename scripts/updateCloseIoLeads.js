@@ -1,8 +1,8 @@
 // Upsert new lead data into Close.io
 
 'use strict';
-if (process.argv.length !== 9) {
-  log("Usage: node <script> <Close.io general API key> <Close.io mail API key1> <Close.io mail API key2> <Close.io mail API key3> <Close.io EU mail API key> <Intercom 'App ID:API key'> <mongo connection Url>");
+if (process.argv.length !== 10) {
+  log("Usage: node <script> <Close.io general API key> <Close.io mail API key1> <Close.io mail API key2> <Close.io mail API key3> <Close.io mail API key4> <Close.io EU mail API key> <Intercom 'App ID:API key'> <mongo connection Url>");
   process.exit();
 }
 
@@ -27,7 +27,7 @@ const customFieldsToRemove = [
 ];
 
 // Skip these problematic leads
-const leadsToSkip = ['6 sınıflar', 'fdsafd', 'ashtasht', 'matt+20160404teacher3 school', 'sdfdsf', 'ddddd', 'dsfadsaf', "Nolan's School of Wonders"];
+const leadsToSkip = ['6 sınıflar', 'fdsafd', 'ashtasht', 'matt+20160404teacher3 school', 'sdfdsf', 'ddddd', 'dsfadsaf', "Nolan's School of Wonders", 'asdfsadf'];
 
 const createTeacherEmailTemplatesAuto1 = ['tmpl_i5bQ2dOlMdZTvZil21bhTx44JYoojPbFkciJ0F560mn', 'tmpl_CEZ9PuE1y4PRvlYiKB5kRbZAQcTIucxDvSeqvtQW57G'];
 const demoRequestEmailTemplatesAuto1 = ['tmpl_s7BZiydyCHOMMeXAcqRZzqn0fOtk0yOFlXSZ412MSGm', 'tmpl_cGb6m4ssDvqjvYd8UaG6cacvtSXkZY3vj9b9lSmdQrf'];
@@ -60,22 +60,26 @@ const closeIoApiKey = process.argv[2];
 const closeIoMailApiKeys = [
   {
     apiKey: process.argv[3],
-    weight: .7
+    weight: .8
   },
   {
     apiKey: process.argv[4],
-    weight: .25
+    weight: .1
   },
   {
     apiKey: process.argv[5],
     weight: .05
   },
+  {
+    apiKey: process.argv[6],
+    weight: .05
+  },
 ];
-const closeIoEuMailApiKey = process.argv[6];
-const intercomAppIdApiKey = process.argv[7];
+const closeIoEuMailApiKey = process.argv[7];
+const intercomAppIdApiKey = process.argv[8];
 const intercomAppId = intercomAppIdApiKey.split(':')[0];
 const intercomApiKey = intercomAppIdApiKey.split(':')[1];
-const mongoConnUrl = process.argv[8];
+const mongoConnUrl = process.argv[9];
 const MongoClient = require('mongodb').MongoClient;
 const async = require('async');
 const countryData = require('country-data');
@@ -323,7 +327,7 @@ function findCocoLeads(done) {
         if (!trialRequest.properties || !trialRequest.properties.email) continue;
         const email = trialRequest.properties.email.toLowerCase();
         emails.push(email);
-        const name = trialRequest.properties.organization || trialRequest.properties.name || email;
+        const name = trialRequest.properties.nces_name || trialRequest.properties.organization || trialRequest.properties.school || email;
         if (!leads[name]) leads[name] = new CocoLead(name);
         leads[name].addTrialRequest(email, trialRequest);
         emailLeadMap[email] = leads[name];
@@ -427,6 +431,12 @@ class CocoLead {
     if (user && user.id) {
       if (!this.contacts[email.toLowerCase()]) this.contacts[email.toLowerCase()] = {};
       this.contacts[email.toLowerCase()].intercomUrl = `https://app.intercom.io/a/apps/${intercomAppId}/users/${user.id}/`;
+      if (user.last_request_at) {
+        this.contacts[email.toLowerCase()].intercomLastSeen = new Date(parseInt(user.last_request_at) * 1000);
+      }
+      if (user.session_count) {
+        this.contacts[email.toLowerCase()].intercomSessionCount = parseInt(user.session_count);
+      }
     }
   }
   addTrialRequest(email, trial) {
@@ -473,6 +483,12 @@ class CocoLead {
           }
         }
       }
+      if (this.contacts[email].intercomLastSeen && (this.contacts[email].intercomLastSeen > (postData.custom['intercom_lastSeen'] || 0))) {
+        postData.custom['intercom_lastSeen'] = this.contacts[email].intercomLastSeen;
+      }
+      if (this.contacts[email].intercomSessionCount && (this.contacts[email].intercomSessionCount > (postData.custom['intercom_sessionCount'] || 0))) {
+        postData.custom['intercom_sessionCount'] = this.contacts[email].intercomSessionCount;
+      }
     }
     return postData;
   }
@@ -500,6 +516,12 @@ class CocoLead {
             putData[`custom.demo_${prop}`] = props[prop];
           }
         }
+      }
+      if (this.contacts[email].intercomLastSeen && (this.contacts[email].intercomLastSeen > (currentCustom['intercom_lastSeen'] || 0))) {
+        putData['custom.intercom_lastSeen'] = this.contacts[email].intercomLastSeen;
+      }
+      if (this.contacts[email].intercomSessionCount && (this.contacts[email].intercomSessionCount > (currentCustom['intercom_sessionCount'] || 0))) {
+        putData['custom.intercom_sessionCount'] = this.contacts[email].intercomSessionCount;
       }
     }
     for (const field of customFieldsToRemove) {
@@ -595,6 +617,8 @@ class CocoLead {
           }
         }
         if (contact.intercomUrl) noteData += `intercom_url: ${contact.intercomUrl}\n`;
+        if (contact.intercomLastSeen) noteData += `intercom_lastSeen: ${contact.intercomLastSeen}\n`;
+        if (contact.intercomSessionCount) noteData += `intercom_sessionCount: ${contact.intercomSessionCount}\n`;
         if (contact.user) {
           const user = contact.user
           noteData += `coco_userID: ${user._id}\n`;
@@ -624,7 +648,7 @@ class CocoLead {
 
 // ** Upsert Close.io methods
 
-function updateExistingLead(lead, existingLead, done) {
+function updateExistingLead(lead, existingLead, userApiKeyMap, done) {
   // console.log('DEBUG: updateExistingLead', existingLead.id);
   const putData = lead.getLeadPutData(existingLead);
   const options = {
@@ -646,7 +670,7 @@ function updateExistingLead(lead, existingLead, done) {
     const tasks = []
     for (const newContact of newContacts) {
       newContact.lead_id = existingLead.id;
-      tasks.push(createAddContactFn(newContact, lead, existingLead));
+      tasks.push(createAddContactFn(newContact, lead, existingLead, userApiKeyMap));
     }
     async.parallel(tasks, (err, results) => {
       if (err) return done(err);
@@ -737,7 +761,7 @@ function createFindExistingLeadFn(email, name, existingLeads) {
   };
 }
 
-function createUpdateLeadFn(lead, existingLeads) {
+function createUpdateLeadFn(lead, existingLeads, userApiKeyMap) {
   return (done) => {
     // console.log('DEBUG: updateLead', lead.name);
     const query = `name:"${lead.name}"`;
@@ -750,7 +774,7 @@ function createUpdateLeadFn(lead, existingLeads) {
           if (existingLeads[lead.name.toLowerCase()]) {
             if (existingLeads[lead.name.toLowerCase()].length === 1) {
               // console.log(`DEBUG: Using lead from email lookup: ${lead.name}`);
-              return updateExistingLead(lead, existingLeads[lead.name.toLowerCase()][0], done);
+              return updateExistingLead(lead, existingLeads[lead.name.toLowerCase()][0], userApiKeyMap, done);
             }
             console.error(`ERROR: ${existingLeads[lead.name.toLowerCase()].length} email leads found for ${lead.name}`);
             return done();
@@ -761,7 +785,7 @@ function createUpdateLeadFn(lead, existingLeads) {
           console.error(`ERROR: ${data.total_results} leads found for ${lead.name}`);
           return done();
         }
-        return updateExistingLead(lead, data.data[0], done);
+        return updateExistingLead(lead, data.data[0], userApiKeyMap, done);
       } catch (error) {
         // console.log(url);
         console.log(`ERROR: updateLead ${error}`);
@@ -772,9 +796,11 @@ function createUpdateLeadFn(lead, existingLeads) {
   };
 }
 
-function createAddContactFn(postData, internalLead, externalLead) {
+function createAddContactFn(postData, internalLead, closeIoLead, userApiKeyMap) {
   return (done) => {
     // console.log('DEBUG: addContact', postData.lead_id);
+
+    // Create new contact
     const options = {
       uri: `https://${closeIoApiKey}:X@app.close.io/api/v1/contact/`,
       body: JSON.stringify(postData)
@@ -788,11 +814,20 @@ function createAddContactFn(postData, internalLead, externalLead) {
         return done();
       }
 
-      // Send emails to new contact
-      const email = postData.emails[0].email;
-      const countryCode = getCountryCode(internalLead.contacts[email].trial.properties.country, [email]);
-      const emailTemplate = getEmailTemplate(internalLead.contacts[email].trial.properties.siteOrigin, externalLead.status_label);
-      sendMail(email, externalLead.id, newContact.id, emailTemplate, getEmailApiKey(externalLead.status_label), emailDelayMinutes, done);
+      // Find previous internal user for new contact correspondence
+      const url = `https://${closeIoApiKey}:X@app.close.io/api/v1/activity/email/?lead_id=${closeIoLead.id}`;
+      request.get(url, (error, response, body) => {
+        if (error) return done(error);
+        const data = JSON.parse(body);
+        let emailApiKey = data.data && data.data.length > 0 ? userApiKeyMap[data.data[0].user_id] : getEmailApiKey(closeIoLead.status_label);
+        if (!emailApiKey) emailApiKey = getEmailApiKey(closeIoLead.status_label);
+
+        // Send email to new contact
+        const email = postData.emails[0].email;
+        const countryCode = getCountryCode(internalLead.contacts[email].trial.properties.country, [email]);
+        const emailTemplate = getEmailTemplate(internalLead.contacts[email].trial.properties.siteOrigin, closeIoLead.status_label);
+        sendMail(email, closeIoLead.id, newContact.id, emailTemplate, emailApiKey, emailDelayMinutes, done);
+      });
     });
   };
 }
@@ -883,25 +918,44 @@ function sendMail(toEmail, leadId, contactId, template, emailApiKey, delayMinute
 }
 
 function updateLeads(leads, done) {
-  // Lookup existing leads via email to protect against direct lead name querying later
-  // Querying via lead name is unreliable
-  const existingLeads = {};
-  const tasks = [];
-  for (const name in leads) {
-    if (leadsToSkip.indexOf(name) >= 0) continue;
-    for (const email in leads[name].contacts) {
-      tasks.push(createFindExistingLeadFn(email.toLowerCase(), name.toLowerCase(), existingLeads));
-    }
+  const userApiKeyMap = {};
+  let createGetUserFn = (apiKey) => {
+    return (done) => {
+      const url = `https://${apiKey}:X@app.close.io/api/v1/me/`;
+      request.get(url, (error, response, body) => {
+        if (error) return done();
+        const results = JSON.parse(body);
+        userApiKeyMap[results.id] = apiKey;
+        return done();
+      });
+    };
   }
-  async.series(tasks, (err, results) => {
-    if (err) return done(err);
+  const tasks = [];
+  for (const closeIoMailApiKey of closeIoMailApiKeys) {
+    tasks.push(createGetUserFn(closeIoMailApiKey.apiKey));
+  }
+  async.parallel(tasks, (err, results) => {
+    if (err) console.log(err);
+    // Lookup existing leads via email to protect against direct lead name querying later
+    // Querying via lead name is unreliable
+    const existingLeads = {};
     const tasks = [];
     for (const name in leads) {
       if (leadsToSkip.indexOf(name) >= 0) continue;
-      tasks.push(createUpdateLeadFn(leads[name], existingLeads));
+      for (const email in leads[name].contacts) {
+        tasks.push(createFindExistingLeadFn(email.toLowerCase(), name.toLowerCase(), existingLeads));
+      }
     }
     async.series(tasks, (err, results) => {
-      return done(err);
+      if (err) return done(err);
+      const tasks = [];
+      for (const name in leads) {
+        if (leadsToSkip.indexOf(name) >= 0) continue;
+        tasks.push(createUpdateLeadFn(leads[name], existingLeads, userApiKeyMap));
+      }
+      async.series(tasks, (err, results) => {
+        return done(err);
+      });
     });
   });
 }

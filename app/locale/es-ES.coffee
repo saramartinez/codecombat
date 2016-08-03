@@ -69,16 +69,24 @@ module.exports = nativeDescription: "español (ES)", englishDescription: "Spanis
 #    computer_science: "Computer science courses for all ages"
 #    show_me_lesson_time: "Show me lesson time estimates for:"
 #    curriculum: "Total curriculum hours:"
+<<<<<<< HEAD
     ffa: "Sin costo para todos los estudiantes"
     lesson_time: "Duración de la lección:"
     coming_soon: "Este otoño!" #"Coming this fall!"
     courses_available_in: "Los cursos son disponible en JavaScript, Python y Java (próximamente!)"
+=======
+#    ffa: "Free for all students"
+#    lesson_time: "Lesson time:"
+#    coming_soon: "Coming this fall!"
+#    courses_available_in: "Courses are available in JavaScript, Python, and Java (coming soon!)"
+>>>>>>> codecombat/master
 #    boast: "Boasts riddles that are complex enough to fascinate gamers and coders alike."
 #    winning: "A winning combination of RPG gameplay and programming homework that pulls off making kid-friendly education legitimately enjoyable."
 #    run_class: "Everything you need to run a computer science class in your school today, no CS background required."
     teachers: "Profesores"
     teachers_and_educators: "Profesores y Educadores"
 #    class_in_box: "Learn how our classroom-in-a-box platform fits into your curriculum."
+<<<<<<< HEAD
     get_started: "Empezar"
     students: "Alumnos:"
     join_class: "Únete el clase"
@@ -89,6 +97,18 @@ module.exports = nativeDescription: "español (ES)", englishDescription: "Spanis
     goto_classes: "Va a mis clases"
     view_profile: "Ve mi perfil"
     view_progress: "Ve progreso"
+=======
+#    get_started: "Get Started"
+    students: "Alumnos:"
+#    join_class: "Join Class"
+#    role: "Your role:"
+#    student_count: "Number of students:"
+#    start_playing_for_free: "Start Playing for Free!"
+#    students_and_players: "Students & Players"
+#    goto_classes: "Go to My Classes"
+#    view_profile: "View My Profile"
+#    view_progress: "View Progress"
+>>>>>>> codecombat/master
 #    check_out_wiki: "Check out our new Educator Wiki"
     want_coco: "Quiere CodeCombat en su escuela?"
     form_select_role: "Seleccione su papel principal"

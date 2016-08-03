@@ -30,11 +30,14 @@ module.exports = class CocoRouter extends Backbone.Router
 
     'admin': go('admin/MainAdminView')
     'admin/clas': go('admin/CLAsView')
+    'admin/classroom-levels': go('admin/AdminClassroomLevelsView')
     'admin/design-elements': go('admin/DesignElementsView')
     'admin/files': go('admin/FilesView')
     'admin/analytics': go('admin/AnalyticsView')
     'admin/analytics/subscriptions': go('admin/AnalyticsSubscriptionsView')
     'admin/level-sessions': go('admin/LevelSessionsView')
+    'admin/school-counts': go('admin/SchoolCountsView')
+    'admin/school-licenses': go('admin/SchoolLicensesView')
     'admin/users': go('admin/UsersView')
     'admin/base': go('admin/BaseView')
     'admin/demo-requests': go('admin/DemoRequestsView')
@@ -48,6 +51,7 @@ module.exports = class CocoRouter extends Backbone.Router
     'artisans/level-tasks': go('artisans/LevelTasksView')
     'artisans/solution-problems': go('artisans/SolutionProblemsView')
     'artisans/thang-tasks': go('artisans/ThangTasksView')
+    'artisans/level-concepts': go('artisans/LevelConceptMap')
 
     'beta': go('HomeView')
 
@@ -123,13 +127,13 @@ module.exports = class CocoRouter extends Backbone.Router
 
     'legal': go('LegalView')
 
-    'multiplayer': go('MultiplayerView')
-
     'play(/)': go('play/CampaignView') # extra slash is to get Facebook app to work
     'play/ladder/:levelID/:leagueType/:leagueID': go('ladder/LadderView')
     'play/ladder/:levelID': go('ladder/LadderView')
     'play/ladder': go('ladder/MainLadderView')
     'play/level/:levelID': go('play/level/PlayLevelView')
+    'play/game-dev-level/:levelID/:sessionID': go('play/level/PlayGameDevLevelView')
+    'play/web-dev-level/:levelID/:sessionID': go('play/level/PlayWebDevLevelView')
     'play/spectate/:levelID': go('play/SpectateView')
     'play/:map': go('play/CampaignView')
 
@@ -190,7 +194,7 @@ module.exports = class CocoRouter extends Backbone.Router
       @listenToOnce application.moduleLoader, 'load-complete', ->
         @routeDirectly(path, args, options)
       return
-    return @openView @notFoundView() if not ViewClass
+    return go('NotFoundView') if not ViewClass
     view = new ViewClass(options, args...)  # options, then any path fragment args
     view.render()
     @openView(view)

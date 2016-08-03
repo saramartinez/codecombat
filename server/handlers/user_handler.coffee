@@ -103,22 +103,22 @@ UserHandler = class UserHandler extends Handler
             return callback(res: 'Facebook user login error.', code: 500) if err
             return callback(null, req, otherUser)
           )
-        r = {message: 'is already used by another account', property: 'email'}
+        r = {message: 'is already used by another account', property: 'email', code: 409}
         return callback({res: r, code: 409}) if otherUser
         user.set('email', req.body.email)
         callback(null, req, user)
 
     # Name setting
     (req, user, callback) ->
-      return callback(null, req, user) unless req.body.name
+      return callback(null, req, user) unless req.body.name?
       nameLower = req.body.name?.toLowerCase()
-      return callback(null, req, user) unless nameLower
+      return callback(null, req, user) unless nameLower?
       return callback(null, req, user) if user.get 'anonymous' # anonymous users can have any name
       return callback(null, req, user) if nameLower is user.get('nameLower')
       User.findOne({nameLower: nameLower, anonymous: false}).exec (err, otherUser) ->
         log.error "Database error setting user name: #{err}" if err
         return callback(res: 'Database error.', code: 500) if err
-        r = {message: 'is already used by another account', property: 'name'}
+        r = {message: 'is already used by another account', property: 'name', code: 409}
         log.info 'Another user exists' if otherUser
         return callback({res: r, code: 409}) if otherUser
         user.set('name', req.body.name)
@@ -408,7 +408,7 @@ UserHandler = class UserHandler extends Handler
 
   getSubSponsors: (req, res) ->
     return @sendForbiddenError(res) unless req.user?.isAdmin()
-    Payment.find {$where: 'this.purchaser.valueOf() != this.recipient.valueOf()'}, (err, payments) =>
+    Payment.find {$where: 'this.purchaser && this.recipient && this.purchaser.valueOf() != this.recipient.valueOf()'}, (err, payments) =>
       return @sendDatabaseError(res, err) if err
       sponsorIDs = (payment.get('purchaser') for payment in payments)
       User.find {$and: [{_id: {$in: sponsorIDs}}, {"stripe.sponsorSubscriptionID": {$exists: true}}]}, (err, users) =>
